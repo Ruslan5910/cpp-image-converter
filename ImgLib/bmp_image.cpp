@@ -24,6 +24,9 @@ static const int BMP_HORIZONTAL_RESOLUTION = 11811;
 static const int BMP_NUMBER_OF_COLORS = 0;
 static const int BMP_NUMBER_OF_SIGNIFICANT_COLORS = 0x1000000;
 
+static const int BYTES_PER_PIXEL = 3;
+static const int BMP_ALIGNMENT = 4;
+
 PACKED_STRUCT_BEGIN BitmapFileHeader {
     char b;
     char m;
@@ -50,7 +53,7 @@ PACKED_STRUCT_END
 
 // функция вычисления отступа по ширине
 static int GetBMPStride(int w) {
-    return 4 * ((w * 3 + 3) / 4);
+    return BMP_ALIGNMENT * ((w * BYTES_PER_PIXEL + BYTES_PER_PIXEL) / BMP_ALIGNMENT);
 }
 
 bool SaveBMP(const Path& file, const Image& image) {
@@ -102,6 +105,10 @@ Image LoadBMP(const Path& file) {
     ifs.read(reinterpret_cast<char*>(&file_header), sizeof(BitmapFileHeader));
     ifs.read(reinterpret_cast<char*>(&info_header), sizeof(BitmapInfoHeader));
     
+    if (ifs.bad()) {
+        return {};
+    }
+
     if (file_header.b != BMP_SIG_B || file_header.m != BMP_SIG_M || file_header.indent != BMP_INDENT || file_header.reserved_space != BMP_RESERVED_SPACE 
         || file_header.header_and_data_size != GetBMPStride(info_header.image_width) * info_header.image_height + BMP_HEADER_SIZE
         || info_header.header_size != BMP_INFO_HEADER_SIZE || info_header.number_of_planes != BMP_NUMBER_OF_PLANES || info_header.bits_per_pixel != BMP_BITS_PER_PIXEL
@@ -119,7 +126,9 @@ Image LoadBMP(const Path& file) {
     for (int y = info_header.image_height - 1; y >= 0; --y) {
         Color* line = image.GetLine(y);
         ifs.read(buff.data(), GetBMPStride(info_header.image_width));
-
+        if (ifs.bad()) {
+           return {};
+        }
         for (int x = 0; x < info_header.image_width; ++x) {
             line[x].b = static_cast<byte>(buff[x * 3 + 0]);
             line[x].g = static_cast<byte>(buff[x * 3 + 1]);
